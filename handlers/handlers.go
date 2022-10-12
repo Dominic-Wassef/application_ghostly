@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"myapp/data"
 	"net/http"
 
@@ -64,4 +65,46 @@ func (h *Handlers) JSON(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.App.ErrorLog.Println(err)
 	}
+}
+
+func (h *Handlers) XML(w http.ResponseWriter, r *http.Request) {
+	type Payload struct {
+		ID      int64    `xml:"id"`
+		Name    string   `xml:"name"`
+		Hobbies []string `xml:"hobbies>hobby"`
+	}
+	var payload Payload
+	payload.ID = 10
+	payload.Name = "John Smith"
+	payload.Hobbies = []string{"Karate", "Tennis", "Programming"}
+
+	err := h.App.WriteXML(w, http.StatusOK, payload)
+	if err != nil {
+		h.App.ErrorLog.Println(err)
+	}
+}
+
+func (h *Handlers) DownloadFile(w http.ResponseWriter, r *http.Request) {
+	h.App.DownloadFile(w, r, "./public/images", "ghostly.jpg")
+}
+
+func (h *Handlers) TestCrypto(w http.ResponseWriter, r *http.Request) {
+	plaintext := "Hello, world"
+	fmt.Fprint(w, "Unencypted"+plaintext+"\n")
+	encypted, err := h.encrypt(plaintext)
+	if err != nil {
+		h.App.ErrorLog.Println(err)
+		h.App.Error500(w, r)
+		return
+	}
+
+	fmt.Fprint(w, "Encrypted: "+encypted+"\n")
+	decrypted, err := h.decrypt(encypted)
+	if err != nil {
+		h.App.ErrorLog.Println(err)
+		h.App.Error500(w, r)
+		return
+	}
+
+	fmt.Fprint(w, "Decrypted: "+decrypted+"\n")
 }
