@@ -67,6 +67,7 @@ github.com/docker/go-units
 # github.com/dominic-wassef/ghostly v0.0.0 => ../ghostly
 ## explicit; go 1.17
 github.com/dominic-wassef/ghostly
+github.com/dominic-wassef/ghostly/cache
 github.com/dominic-wassef/ghostly/render
 github.com/dominic-wassef/ghostly/session
 # github.com/go-chi/chi/v5 v5.0.4
@@ -90,6 +91,9 @@ github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
 github.com/golang-migrate/migrate/v4/source/file
 github.com/golang-migrate/migrate/v4/source/iofs
+# github.com/gomodule/redigo v1.8.9
+## explicit; go 1.16
+github.com/gomodule/redigo/redis
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 ## explicit; go 1.13
 github.com/google/shlex
