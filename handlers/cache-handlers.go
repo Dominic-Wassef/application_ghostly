@@ -1,6 +1,10 @@
 package handlers
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/justinas/nosurf"
+)
 
 func (h *Handlers) ShowCachePage(w http.ResponseWriter, r *http.Request) {
 	err := h.render(w, r, "cache", nil, nil)
@@ -22,6 +26,11 @@ func (h *Handlers) SaveInCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !nosurf.VerifyToken(nosurf.Token(r), userInput.CSRF) {
+		h.App.Error500(w, r)
+		return
+	}
+
 	err = h.App.Cache.Set(userInput.Name, userInput.Value)
 	if err != nil {
 		h.App.Error500(w, r)
@@ -32,14 +41,17 @@ func (h *Handlers) SaveInCache(w http.ResponseWriter, r *http.Request) {
 		Error   bool   `json:"error"`
 		Message string `json:"message"`
 	}
+
 	resp.Error = false
-	resp.Message = "Saved in cache!"
+	resp.Message = "Saved in cache"
+
 	_ = h.App.WriteJson(w, http.StatusCreated, resp)
 }
 
 func (h *Handlers) GetFromCache(w http.ResponseWriter, r *http.Request) {
 	var msg string
 	var inCache = true
+
 	var userInput struct {
 		Name string `json:"name"`
 		CSRF string `json:"csrf_token"`
@@ -51,9 +63,14 @@ func (h *Handlers) GetFromCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !nosurf.VerifyToken(nosurf.Token(r), userInput.CSRF) {
+		h.App.Error500(w, r)
+		return
+	}
+
 	fromCache, err := h.App.Cache.Get(userInput.Name)
 	if err != nil {
-		msg = "Not found in cache"
+		msg = "Not found in cache!"
 		inCache = false
 	}
 
@@ -65,7 +82,7 @@ func (h *Handlers) GetFromCache(w http.ResponseWriter, r *http.Request) {
 
 	if inCache {
 		resp.Error = false
-		resp.Message = "Success!"
+		resp.Message = "Success"
 		resp.Value = fromCache.(string)
 	} else {
 		resp.Error = true
@@ -86,6 +103,11 @@ func (h *Handlers) DeleteFromCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !nosurf.VerifyToken(nosurf.Token(r), userInput.CSRF) {
+		h.App.Error500(w, r)
+		return
+	}
+
 	err = h.App.Cache.Forget(userInput.Name)
 	if err != nil {
 		h.App.Error500(w, r)
@@ -97,7 +119,8 @@ func (h *Handlers) DeleteFromCache(w http.ResponseWriter, r *http.Request) {
 		Message string `json:"message"`
 	}
 	resp.Error = false
-	resp.Message = "Deleted from cache!"
+	resp.Message = "Deleted from cache (if it existed)"
+
 	_ = h.App.WriteJson(w, http.StatusCreated, resp)
 }
 
@@ -111,6 +134,12 @@ func (h *Handlers) EmptyCache(w http.ResponseWriter, r *http.Request) {
 		h.App.Error500(w, r)
 		return
 	}
+
+	if !nosurf.VerifyToken(nosurf.Token(r), userInput.CSRF) {
+		h.App.Error500(w, r)
+		return
+	}
+
 	err = h.App.Cache.Empty()
 	if err != nil {
 		h.App.Error500(w, r)
@@ -123,5 +152,7 @@ func (h *Handlers) EmptyCache(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.Error = false
 	resp.Message = "Emptied cache!"
+
 	_ = h.App.WriteJson(w, http.StatusCreated, resp)
+
 }
