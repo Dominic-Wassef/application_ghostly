@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"myapp/data"
 	"net/http"
+	"time"
 
 	"github.com/CloudyKit/jet/v6"
 	"github.com/dominic-wassef/ghostly"
@@ -22,6 +23,7 @@ func (h *Handlers) Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) GoPage(w http.ResponseWriter, r *http.Request) {
+	defer h.App.LoadTime(time.Now())
 	err := h.App.Render.GoPage(w, r, "home", nil)
 	if err != nil {
 		h.App.ErrorLog.Println("error rendering:", err)
