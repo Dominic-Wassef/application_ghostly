@@ -10,6 +10,7 @@ import (
 
 	"github.com/CloudyKit/jet/v6"
 	"github.com/alexedwards/scs/v2"
+	"github.com/dgraph-io/badger/v3"
 	"github.com/dominic-wassef/ghostly/cache"
 	"github.com/dominic-wassef/ghostly/mailer"
 	"github.com/dominic-wassef/ghostly/render"
@@ -17,11 +18,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 )
 
 const version = "1.0.0"
 
 var myRedisCache *cache.RedisCache
+var myBadgerCache *cache.BadgerCache
+var redisPool *redis.Pool
+var badgerConn *badger.DB
 
 // Ghostly is the overall type for the Ghostly package. Members that are exported in this type
 // are available to any application that uses it.
@@ -40,6 +45,8 @@ type Ghostly struct {
 	config        config
 	EncryptionKey string
 	Cache         cache.Cache
+	Scheduler     *cron.Cron
+	Mail          mailer.Mail
 }
 
 type config struct {
@@ -91,9 +98,25 @@ func (g *Ghostly) New(rootPath string) error {
 		}
 	}
 
+	schduler := cron.New()
+	g.Scheduler = schduler
+
 	if os.Getenv("CACHE") == "redis" || os.Getenv("SESSION_TYPE") == "redis" {
 		myRedisCache = g.createClientRedisCache()
 		g.Cache = myRedisCache
+		redisPool = myRedisCache.Conn
+	}
+
+	if os.Getenv("CACHE") == "badger" {
+		myBadgerCache = g.createClientBadgerCache()
+		g.Cache = myBadgerCache
+		badgerConn = myBadgerCache.Conn
+		_, err = g.Scheduler.AddFunc("@daily", func() {
+			_ = myBadgerCache.Conn.RunValueLogGC(0.7)
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	g.InfoLog = infoLog
@@ -147,12 +170,20 @@ func (g *Ghostly) New(rootPath string) error {
 	g.Session = sess.InitSession()
 	g.EncryptionKey = os.Getenv("KEY")
 
-	var views = jet.NewSet(
-		jet.NewOSFileSystemLoader(fmt.Sprintf("%s/views", rootPath)),
-		// jet.InDevelopmentMode(),
-	)
+	if g.Debug {
+		var views = jet.NewSet(
+			jet.NewOSFileSystemLoader(fmt.Sprintf("%s/views", rootPath)),
+			jet.InDevelopmentMode(),
+		)
 
-	g.JetViews = views
+		g.JetViews = views
+	} else {
+		var views = jet.NewSet(
+			jet.NewOSFileSystemLoader(fmt.Sprintf("%s/views", rootPath)),
+		)
+
+		g.JetViews = views
+	}
 
 	g.createRenderer()
 	go g.Mail.ListenForMail()
@@ -184,7 +215,15 @@ func (g *Ghostly) ListenAndServe() {
 		WriteTimeout: 600 * time.Second,
 	}
 
-	defer g.DB.Pool.Close()
+	if g.DB.Pool != nil {
+		defer g.DB.Pool.Close()
+	}
+	if redisPool != nil {
+		defer redisPool.Close()
+	}
+	if badgerConn != nil {
+		defer badgerConn.Close()
+	}
 
 	g.InfoLog.Printf("Listening on port %s", os.Getenv("PORT"))
 	err := srv.ListenAndServe()
@@ -249,6 +288,13 @@ func (g *Ghostly) createClientRedisCache() *cache.RedisCache {
 	return &cacheClient
 }
 
+func (g *Ghostly) createClientBadgerCache() *cache.BadgerCache {
+	cacheClient := cache.BadgerCache{
+		Conn: g.createBadgerConn(),
+	}
+	return &cacheClient
+}
+
 // Redis function
 func (g *Ghostly) createRedisPool() *redis.Pool {
 	return &redis.Pool{
@@ -266,6 +312,14 @@ func (g *Ghostly) createRedisPool() *redis.Pool {
 			return err
 		},
 	}
+}
+
+func (g *Ghostly) createBadgerConn() *badger.DB {
+	db, err := badger.Open(badger.DefaultOptions(g.RootPath + "/tmp/badger"))
+	if err != nil {
+		return nil
+	}
+	return db
 }
 
 // BuildDSN builds the datasource name for our database, and returns it as a string
