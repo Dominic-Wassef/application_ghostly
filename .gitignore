@@ -1,0 +1,3 @@
+db-data/postgres/postmaster.pid
+db-data/postgres/pg_stat_tmp/global.stat
+db-data/postgres/postmaster.pid
