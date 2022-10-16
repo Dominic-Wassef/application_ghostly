@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dominic-wassef/ghostly/mailer"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -35,11 +36,36 @@ func (a *application) routes() *chi.Mux {
 	a.post("/api/delete-from-cache", a.Handlers.DeleteFromCache)
 	a.post("/api/empty-cache", a.Handlers.EmptyCache)
 
+	a.get("/test-mail", func(w http.ResponseWriter, r *http.Request) {
+		msg := mailer.Message{
+			From:        "dominic@wassef.dev",
+			To:          "domwassef@gmail.com",
+			Subject:     "Test Subject - sent using an go channel",
+			Template:    "test",
+			Attachments: nil,
+			Data:        nil,
+		}
+
+		a.App.Mail.Jobs <- msg
+		res := <-a.App.Mail.Results
+		if res.Error != nil {
+			a.App.ErrorLog.Println(res.Error)
+		}
+		// err := a.App.Mail.SendSMTPMessage(msg)
+		// if err != nil {
+		// 	a.App.ErrorLog.Println(err)
+		// 	return
+		// }
+
+		fmt.Fprint(w, "Sent mail!")
+
+	})
+
 	a.App.Routes.Get("/create-user", func(w http.ResponseWriter, r *http.Request) {
 		u := data.User{
 			FirstName: "Dominic",
 			LastName:  "Wassef",
-			Email:     "me@here.com",
+			Email:     "dominic@wassef.dev",
 			Active:    1,
 			Password:  "password",
 		}
