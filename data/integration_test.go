@@ -32,7 +32,7 @@ var (
 var dummyUser = User{
 	FirstName: "Some",
 	LastName:  "Guy",
-	Email:     "me@here.com",
+	Email:     "dominic@wassef.dev",
 	Active:    1,
 	Password:  "password",
 }
@@ -208,7 +208,7 @@ func TestUser_GetAll(t *testing.T) {
 }
 
 func TestUser_GetByEmail(t *testing.T) {
-	u, err := models.Users.GetByEmail("me@here.com")
+	u, err := models.Users.GetByEmail("dominic@wassef.dev")
 	if err != nil {
 		t.Error("failed to get user: ", err)
 	}
@@ -393,7 +393,7 @@ var authData = []struct {
 
 	{"no_user", "abcdefghijklmnopqrstuvwxyz", "a@here.com", true, "no user but token accepted as valid"},
 
-	{"valid", "", "me@here.com", false, "valid token reported as invalid"},
+	{"valid", "", "dominic@wassef.dev", false, "valid token reported as invalid"},
 }
 
 func TestToken_AuthenticateToken(t *testing.T) {
