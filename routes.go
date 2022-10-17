@@ -12,6 +12,7 @@ import (
 
 func (a *application) routes() *chi.Mux {
 	// middleware must come before any routes
+	a.use(a.Middleware.CheckRemember)
 
 	// add routes here
 	a.get("/", a.Handlers.Home)
@@ -22,6 +23,8 @@ func (a *application) routes() *chi.Mux {
 	a.App.Routes.Get("/users/login", a.Handlers.UserLogin)
 	a.post("/users/login", a.Handlers.PostUserLogin)
 	a.App.Routes.Get("/users/logout", a.Handlers.Logout)
+	a.get("/users/forgot-password", a.Handlers.Forgot)
+	a.post("/users/forgot-password", a.Handlers.PostForgot)
 
 	a.App.Routes.Get("/form", a.Handlers.Form)
 	a.App.Routes.Post("/form", a.Handlers.PostForm)
@@ -29,7 +32,9 @@ func (a *application) routes() *chi.Mux {
 	a.get("/json", a.Handlers.JSON)
 	a.get("/xml", a.Handlers.XML)
 	a.get("/download-file", a.Handlers.DownloadFile)
+
 	a.get("/crypto", a.Handlers.TestCrypto)
+
 	a.get("/cache-test", a.Handlers.ShowCachePage)
 	a.post("/api/save-in-cache", a.Handlers.SaveInCache)
 	a.post("/api/get-from-cache", a.Handlers.GetFromCache)
@@ -38,9 +43,9 @@ func (a *application) routes() *chi.Mux {
 
 	a.get("/test-mail", func(w http.ResponseWriter, r *http.Request) {
 		msg := mailer.Message{
-			From:        "dominic@wassef.dev",
-			To:          "domwassef@gmail.com",
-			Subject:     "Test Subject - sent using an go channel",
+			From:        "info@verilion.com",
+			To:          "trevor.sawler@gmail.com",
+			Subject:     "Test Subject - sent using an API",
 			Template:    "test",
 			Attachments: nil,
 			Data:        nil,
@@ -57,15 +62,14 @@ func (a *application) routes() *chi.Mux {
 		// 	return
 		// }
 
-		fmt.Fprint(w, "Sent mail!")
-
+		fmt.Fprint(w, "Send mail!")
 	})
 
 	a.App.Routes.Get("/create-user", func(w http.ResponseWriter, r *http.Request) {
 		u := data.User{
-			FirstName: "Dominic",
-			LastName:  "Wassef",
-			Email:     "dominic@wassef.dev",
+			FirstName: "Trevor",
+			LastName:  "Sawler",
+			Email:     "me@here.com",
 			Active:    1,
 			Password:  "password",
 		}
@@ -121,7 +125,6 @@ func (a *application) routes() *chi.Mux {
 			fmt.Fprint(w, "failed validation")
 			return
 		}
-
 		err = u.Update(*u)
 		if err != nil {
 			a.App.ErrorLog.Println(err)
