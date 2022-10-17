@@ -45,6 +45,8 @@ func (g *Render) defaultData(td *TemplateData, r *http.Request) *TemplateData {
 	if g.Session.Exists(r.Context(), "userID") {
 		td.IsAuthenticated = true
 	}
+	td.Error = g.Session.PopString(r.Context(), "error")
+	td.Flash = g.Session.PopString(r.Context(), "flash")
 	return td
 }
 
