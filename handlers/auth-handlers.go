@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/CloudyKit/jet/v6"
 	"github.com/dominic-wassef/ghostly/mailer"
 	"github.com/dominic-wassef/ghostly/urlsigner"
 )
@@ -125,11 +126,13 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Forgot(w http.ResponseWriter, r *http.Request) {
 	err := h.render(w, r, "forgot", nil, nil)
 	if err != nil {
-		h.App.ErrorLog.Println("Error rendering : ", err)
+		h.App.ErrorLog.Println("Error rendering: ", err)
 		h.App.Error500(w, r)
 	}
 }
 
+// PostForgot looks up a user by email, and if the user is found, generates
+// an email with a singed link to the reset password form
 func (h *Handlers) PostForgot(w http.ResponseWriter, r *http.Request) {
 	// parse form
 	err := r.ParseForm()
@@ -138,7 +141,7 @@ func (h *Handlers) PostForgot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// verify supplied email exists
+	// verify that supplied email exists
 	var u *data.User
 	email := r.Form.Get("email")
 	u, err = u.GetByEmail(email)
@@ -147,13 +150,14 @@ func (h *Handlers) PostForgot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// create a link to password
-	link := fmt.Sprintf("%s/user/reset-password?email=%s", h.App.Server.URL, email)
+	// create a link to password reset form
+	link := fmt.Sprintf("%s/users/reset-password?email=%s", h.App.Server.URL, email)
 
 	// sign the link
 	sign := urlsigner.Signer{
 		Secret: []byte(h.App.EncryptionKey),
 	}
+
 	signedLink := sign.GenerateTokenFromString(link)
 	h.App.InfoLog.Println("Signed link is", signedLink)
 
@@ -162,6 +166,7 @@ func (h *Handlers) PostForgot(w http.ResponseWriter, r *http.Request) {
 		Link string
 	}
 	data.Link = signedLink
+
 	msg := mailer.Message{
 		To:       u.Email,
 		Subject:  "Password reset",
@@ -178,5 +183,79 @@ func (h *Handlers) PostForgot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// redirect the user
+	http.Redirect(w, r, "/users/login", http.StatusSeeOther)
+}
+
+// ResetPasswordForm validates a signed url, and displays the password reset form, if appropriate
+func (h *Handlers) ResetPasswordForm(w http.ResponseWriter, r *http.Request) {
+	// get form values
+	email := r.URL.Query().Get("email")
+	theURL := r.RequestURI
+	testURL := fmt.Sprintf("%s%s", h.App.Server.URL, theURL)
+
+	// validate the url
+	signer := urlsigner.Signer{
+		Secret: []byte(h.App.EncryptionKey),
+	}
+
+	valid := signer.VerifyToken(testURL)
+	if !valid {
+		h.App.ErrorLog.Print("Invalid url")
+		h.App.ErrorUnauthorized(w, r)
+		return
+	}
+
+	/// make sure it's not expired
+	expired := signer.Expired(testURL, 60)
+	if expired {
+		h.App.ErrorLog.Print("Link expired")
+		h.App.ErrorUnauthorized(w, r)
+		return
+	}
+
+	// display form
+	encryptedEmail, _ := h.encrypt(email)
+
+	vars := make(jet.VarMap)
+	vars.Set("email", encryptedEmail)
+
+	err := h.render(w, r, "reset-password", vars, nil)
+	if err != nil {
+		return
+	}
+}
+
+func (h *Handlers) PostResetPassword(w http.ResponseWriter, r *http.Request) {
+	// parse the form
+	err := r.ParseForm()
+	if err != nil {
+		h.App.Error500(w, r)
+		return
+	}
+
+	// get and decrypt the email
+	email, err := h.decrypt(r.Form.Get("email"))
+	if err != nil {
+		h.App.Error500(w, r)
+		return
+	}
+
+	// get the user
+	var u data.User
+	user, err := u.GetByEmail(email)
+	if err != nil {
+		h.App.Error500(w, r)
+		return
+	}
+
+	// reset the password
+	err = user.ResetPassword(user.ID, r.Form.Get("password"))
+	if err != nil {
+		h.App.Error500(w, r)
+		return
+	}
+
+	// redirect
+	h.App.Session.Put(r.Context(), "flash", "Password reset. You can now log in.")
 	http.Redirect(w, r, "/users/login", http.StatusSeeOther)
 }
