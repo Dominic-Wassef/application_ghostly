@@ -27,7 +27,6 @@ func (u *User) Table() string {
 	return "users"
 }
 
-// validation func
 func (u *User) Validate(validator *ghostly.Validation) {
 	validator.Check(u.LastName != "", "last_name", "Last name must be provided")
 	validator.Check(u.FirstName != "", "first_name", "First name must be provided")
@@ -187,4 +186,13 @@ func (u *User) PasswordMatches(plainText string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (u *User) CheckForRememberToken(id int, token string) bool {
+	var rememberToken RememberToken
+	rt := RememberToken{}
+	collection := upper.Collection(rt.Table())
+	res := collection.Find(up.Cond{"user_id": id, "remember_token": token})
+	err := res.One(&rememberToken)
+	return err == nil
 }
